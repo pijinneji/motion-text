@@ -9,6 +9,20 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: black; overflow: hidden; }
     canvas { display: block; }
+    video {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      opacity: 0.3;
+      z-index: 0;
+    }
+    canvas {
+      position: fixed;
+      top: 0; left: 0;
+      z-index: 1;
+      background: transparent;
+    }
   </style>
 </head>
 <body>
@@ -61,6 +75,138 @@ class TextParticle {
     if (this.age > this.life * 0.5) {
       this.alpha = map(this.age, this.life * 0.5, this.life, 255, 0);
     }
+  }
+  isDead() { return this.age >= this.life; }
+  draw() {
+    push();
+    textSize(this.size);
+    textFont('monospace');
+    fill(255, 255, 255, this.alpha);
+    noStroke();
+    text(this.text, this.x, this.y);
+    pop();
+  }
+}
+
+function setup() {
+  let cnv = createCanvas(windowWidth, windowHeight);
+  cnv.style('background', 'transparent');
+  clear();
+  frameRate(30);
+
+  // videoタグをDOMに追加
+  video = document.createElement('video');
+  video.setAttribute('playsinline', '');
+  video.setAttribute('autoplay', '');
+  video.muted = true;
+  document.body.insertBefore(video, document.body.firstChild);
+
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'user' },
+    audio: false
+  }).then(stream => {
+    video.srcObject = stream;
+    video.play();
+    video.addEventListener('loadedmetadata', () => {
+      videoReady = true;
+    });
+  }).catch(err => {
+    console.error('カメラエラー:', err);
+  });
+}
+
+function draw() {
+  clear();
+
+  if (!videoReady) {
+    fill(80);
+    textSize(14);
+    textAlign(CENTER);
+    text('カメラ起動中...', width/2, height/2);
+    return;
+  }
+
+  let vw = video.videoWidth;
+  let vh = video.videoHeight;
+  if (vw === 0 || vh === 0) return;
+
+  // 動き検出
+  let offCanvas = document.createElement('canvas');
+  offCanvas.width = 160;
+  offCanvas.height = 120;
+  let ctx = offCanvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, 160, 120);
+  let currentFrame = ctx.getImageData(0, 0, 160, 120).data;
+
+  motionPixels = [];
+
+  if (prevFrame && prevFrame.length === currentFrame.length) {
+    let diffCount = 0;
+    let total = 160 * 120;
+
+    for (let i = 0; i < currentFrame.length; i += 4) {
+      let dr = abs(currentFrame[i]   - prevFrame[i]);
+      let dg = abs(currentFrame[i+1] - prevFrame[i+1]);
+      let db = abs(currentFrame[i+2] - prevFrame[i+2]);
+      let diff = (dr + dg + db) / 3;
+
+      if (diff > 20) {
+        diffCount++;
+        let pixelIndex = i / 4;
+        let px = (pixelIndex % 160) / 160 * width;
+        let py = floor(pixelIndex / 160) / 120 * height;
+        motionPixels.push({ x: px, y: py });
+      }
+    }
+
+    let motionAmount = diffCount / total;
+
+    let now = millis();
+    if (motionAmount > 0.003 && motionPixels.length > 0 && now - lastGenerateTime > GENERATE_INTERVAL) {
+      lastGenerateTime = now;
+      spawnTexts(motionAmount);
+    }
+
+    // デバッグ表示
+    fill(150);
+    textSize(11);
+    textAlign(LEFT);
+    text('motion: ' + nf(motionAmount, 1, 4), 10, 20);
+    text('particles: ' + textParticles.length, 10, 35);
+  }
+
+  prevFrame = currentFrame;
+
+  // テキスト描画
+  textParticles = textParticles.filter(p => !p.isDead());
+  for (let p of textParticles) {
+    p.update();
+    p.draw();
+  }
+}
+
+function spawnTexts(motionAmount) {
+  let tier = motionAmount < 0.008 ? 'slow' : motionAmount < 0.020 ? 'medium' : 'fast';
+  let pool = VOCABULARY[tier];
+  let count = COUNT[tier];
+
+  for (let i = 0; i < count; i++) {
+    if (motionPixels.length === 0) break;
+    let pt = motionPixels[floor(random(motionPixels.length))];
+    let word = pool[floor(random(pool.length))];
+    let ox = random(-50, 50);
+    let oy = random(-50, 50);
+    textParticles.push(new TextParticle(pt.x + ox, pt.y + oy, word, motionAmount));
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+</script>
+</body>
+</html>    }
   }
   isDead() { return this.age >= this.life; }
   draw() {
