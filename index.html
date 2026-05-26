@@ -81,7 +81,7 @@ class TextParticle {
 function setup() {
   createCanvas(windowWidth, windowHeight);
   capture = createCapture({ video: { facingMode: 'user' }, audio: false });
-  capture.size(240, 320); // 軽くするため小さめ
+  capture.size(windowWidth, windowHeight);// 軽くするため小さめ
   capture.hide();
   frameRate(30);
 }
