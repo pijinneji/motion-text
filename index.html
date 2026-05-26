@@ -99,7 +99,15 @@ function draw() {
 
   // カメラ映像を画面サイズに引き伸ばして描画（暗め）
   tint(80);
-  image(capture, 0, 0, width, height);
+  // アスペクト比を保ってカメラ映像を中央に表示
+  let camW = capture.width;
+  let camH = capture.height;
+  let scale = max(width / camW, height / camH);
+  let drawW = camW * scale;
+  let drawH = camH * scale;
+  let offsetX = (width - drawW) / 2;
+  let offsetY = (height - drawH) / 2;
+  image(capture, offsetX, offsetY, drawW, drawH);
   noTint();
 
   // 動き検出
