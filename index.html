@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>動きとテキスト</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: black; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script>
+
+const VOCABULARY = {
+  slow: [
+    '静止', '沈殿', 'still', '皮膚', '内側',
+    '息', 'membrane', '重力', '待機', 'sediment',
+    '止まれない', 'trace', '残像', '圧力'
+  ],
+  medium: [
+    '移行', 'shift', '境界', '摩擦', '接触',
+    'displacement', '重なり', '距離', 'between',
+    '崩れる', 'threshold', '浸透', '反復'
+  ],
+  fast: [
+    '飛散', 'scatter', '断絶', '衝突', '逸脱',
+    'rupture', '過剰', '閾値', 'overflow',
+    '解体', 'fragment', '速度', '離脱', 'excess'
+  ]
+};
+
+const COUNT = { slow: 2, medium: 4, fast: 6 };
+
+let capture;
+let bodyPix;
+let segmentation = null;
+let prevPixels = null;
+let textParticles = [];
+let lastGenerateTime = 0;
+const GENERATE_INTERVAL = 2500;
+
+class TextParticle {
+  constructor(x, y, text, speed) {
+    this.x = x;
+    this.y = y;
+    this.text = text;
+    this.alpha = 255;
+    this.vy = map(speed, 0, 1, -0.3, -2.0);
+    this.vx = random(-0.3, 0.3);
+    this.life = floor(map(speed, 0, 1, 220, 100));
+    this.age = 0;
+    this.size = floor(random(12, 20));
+  }
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.age++;
+    if (this.age > this.life * 0.5) {
+      this.alpha = map(this.age, this.life * 0.5, this.life, 255, 0);
+    }
+  }
+  isDead() { return this.age >= this.life; }
+  draw() {
+    push();
+    textSize(this.size);
+    textFont('monospace');
+    fill(255, 255, 255, this.alpha);
+    noStroke();
+    text(this.text, this.x, this.y);
+    pop();
+  }
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  capture = createCapture({ video: { facingMode: 'user' }, audio: false });
+  capture.size(width, height);
+  capture.hide();
+
+  bodyPix = ml5.bodyPix(capture, { multiplier: 0.50 }, () => {
+    console.log('ready');
+    segmentLoop();
+  });
+}
+
+function segmentLoop() {
+  bodyPix.segment((err, result) => {
+    if (!err) segmentation = result;
+    segmentLoop();
+  });
+}
+
+function draw() {
+  background(0);
+
+  if (!segmentation) {
+    fill(80);
+    textSize(14);
+    textAlign(CENTER);
+    text('起動中...', width/2, height/2);
+    return;
+  }
+
+  let maskPixels = segmentation.raw.personMask;
+
+  capture.loadPixels();
+  loadPixels();
+  for (let i = 0; i < width * height; i++) {
+    if (maskPixels[i] === 1) {
+      let r = capture.pixels[i*4];
+      let g = capture.pixels[i*4+1];
+      let b = capture.pixels[i*4+2];
+      let gray = (r + g + b) / 3 * 0.35;
+      pixels[i*4]   = gray;
+      pixels[i*4+1] = gray;
+      pixels[i*4+2] = gray;
+      pixels[i*4+3] = 255;
+    } else {
+      pixels[i*4]   = 0;
+      pixels[i*4+1] = 0;
+      pixels[i*4+2] = 0;
+      pixels[i*4+3] = 255;
+    }
+  }
+  updatePixels();
+
+  let motionAmount = calcMotion(maskPixels);
+  prevPixels = maskPixels.slice();
+
+  let now = millis();
+  if (motionAmount > 0.008 && now - lastGenerateTime > GENERATE_INTERVAL) {
+    lastGenerateTime = now;
+    spawnTexts(maskPixels, motionAmount);
+  }
+
+  textParticles = textParticles.filter(p => !p.isDead());
+  for (let p of textParticles) {
+    p.update();
+    p.draw();
+  }
+}
+
+function calcMotion(current) {
+  if (!prevPixels) return 0;
+  let diff = 0;
+  for (let i = 0; i < current.length; i++) {
+    if (current[i] !== prevPixels[i]) diff++;
+  }
+  return diff / current.length;
+}
+
+function getPersonPoints(mask, count) {
+  let personPixels = [];
+  for (let i = 0; i < mask.length; i++) {
+    if (mask[i] === 1) personPixels.push(i);
+  }
+  let points = [];
+  for (let i = 0; i < count; i++) {
+    let idx = personPixels[floor(random(personPixels.length))];
+    points.push({ x: idx % width, y: floor(idx / width) });
+  }
+  return points;
+}
+
+function spawnTexts(mask, motionAmount) {
+  let tier = motionAmount < 0.04 ? 'slow' : motionAmount < 0.12 ? 'medium' : 'fast';
+  let pool = VOCABULARY[tier];
+  let count = COUNT[tier];
+  let points = getPersonPoints(mask, count);
+
+  for (let i = 0; i < count; i++) {
+    let word = pool[floor(random(pool.length))];
+    let pt = points[i % points.length];
+    let ox = random(-60, 60);
+    let oy = random(-60, 60);
+    textParticles.push(new TextParticle(pt.x + ox, pt.y + oy, word, motionAmount));
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+</script>
+</body>
+</html>
