@@ -14,9 +14,6 @@
 <body>
 <script>
 
-// ml5を使わず、ピクセル差分だけで動き検出するシンプル版
-// BodyPixのバージョン問題を回避する
-
 const VOCABULARY = {
   slow: [
     '静止', '沈殿', 'still', '皮膚', '内側',
@@ -43,7 +40,6 @@ let textParticles = [];
 let lastGenerateTime = 0;
 const GENERATE_INTERVAL = 2000;
 
-// 動きがある領域を記録
 let motionPixels = [];
 
 class TextParticle {
@@ -61,6 +57,126 @@ class TextParticle {
   update() {
     this.x += this.vx;
     this.y += this.vy;
+    this.age++;
+    if (this.age > this.life * 0.5) {
+      this.alpha = map(this.age, this.life * 0.5, this.life, 255, 0);
+    }
+  }
+  isDead() { return this.age >= this.life; }
+  draw() {
+    push();
+    textSize(this.size);
+    textFont('monospace');
+    fill(255, 255, 255, this.alpha);
+    noStroke();
+    text(this.text, this.x, this.y);
+    pop();
+  }
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  capture = createCapture({ video: { facingMode: 'user' }, audio: false });
+  capture.size(windowWidth, windowHeight);
+  capture.hide();
+  frameRate(30);
+}
+
+function draw() {
+  background(0);
+
+  if (!capture || capture.width === 0) {
+    fill(80);
+    textSize(14);
+    textAlign(CENTER);
+    text('カメラ起動中...', width/2, height/2);
+    return;
+  }
+
+  // カメラ映像をアスペクト比を保って表示
+  let camW = capture.width;
+  let camH = capture.height;
+  let scale = max(width / camW, height / camH);
+  let drawW = camW * scale;
+  let drawH = camH * scale;
+  let offsetX = (width - drawW) / 2;
+  let offsetY = (height - drawH) / 2;
+  tint(80);
+  image(capture, offsetX, offsetY, drawW, drawH);
+  noTint();
+
+  // 動き検出
+  capture.loadPixels();
+  motionPixels = [];
+
+  if (prevFrame && prevFrame.length === capture.pixels.length) {
+    let diffCount = 0;
+    let camPixelCount = capture.width * capture.height;
+
+    for (let i = 0; i < capture.pixels.length; i += 4) {
+      let dr = abs(capture.pixels[i]   - prevFrame[i]);
+      let dg = abs(capture.pixels[i+1] - prevFrame[i+1]);
+      let db = abs(capture.pixels[i+2] - prevFrame[i+2]);
+      let diff = (dr + dg + db) / 3;
+
+      if (diff > 20) {
+        diffCount++;
+        let pixelIndex = i / 4;
+        let px = (pixelIndex % capture.width) / capture.width * width;
+        let py = floor(pixelIndex / capture.width) / capture.height * height;
+        motionPixels.push({ x: px, y: py });
+      }
+    }
+
+    let motionAmount = diffCount / camPixelCount;
+
+    // テキスト生成
+    let now = millis();
+    if (motionAmount > 0.003 && motionPixels.length > 0 && now - lastGenerateTime > GENERATE_INTERVAL) {
+      lastGenerateTime = now;
+      spawnTexts(motionAmount);
+    }
+
+    // デバッグ表示
+    fill(150);
+    textSize(11);
+    textAlign(LEFT);
+    text('motion: ' + nf(motionAmount, 1, 4), 10, 20);
+    text('particles: ' + textParticles.length, 10, 35);
+  }
+
+  prevFrame = capture.pixels.slice();
+
+  // テキスト描画
+  textParticles = textParticles.filter(p => !p.isDead());
+  for (let p of textParticles) {
+    p.update();
+    p.draw();
+  }
+}
+
+function spawnTexts(motionAmount) {
+  let tier = motionAmount < 0.008 ? 'slow' : motionAmount < 0.020 ? 'medium' : 'fast';
+  let pool = VOCABULARY[tier];
+  let count = COUNT[tier];
+
+  for (let i = 0; i < count; i++) {
+    if (motionPixels.length === 0) break;
+    let pt = motionPixels[floor(random(motionPixels.length))];
+    let word = pool[floor(random(pool.length))];
+    let ox = random(-50, 50);
+    let oy = random(-50, 50);
+    textParticles.push(new TextParticle(pt.x + ox, pt.y + oy, word, motionAmount));
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+</script>
+</body>
+</html>    this.y += this.vy;
     this.age++;
     if (this.age > this.life * 0.5) {
       this.alpha = map(this.age, this.life * 0.5, this.life, 255, 0);
