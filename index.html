@@ -47,7 +47,6 @@ let lastGenerateTime = 0;
 const GENERATE_INTERVAL = 1500;
 let prevLandmarks = null;
 
-// キャンバスサイズ設定
 function resize() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -55,7 +54,6 @@ function resize() {
 resize();
 window.addEventListener('resize', resize);
 
-// テキスト粒子
 class TextParticle {
   constructor(x, y, text, speed) {
     this.x = x;
@@ -63,6 +61,32 @@ class TextParticle {
     this.text = text;
     this.alpha = 1;
     this.vy = -0.4 - speed * 2;
+    this.vx = (Math.random() - 0.5) * 0.6;
+    this.life = 120 + Math.random() * 80;
+    this.age = 0;
+    this.size = 12 + Math.floor(Math.random() * 12);
+  }
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.age++;
+    if (this.age > this.life * 0.5) {
+      this.alpha = (this.life - this.age) / (this.life * 0.5);
+    }
+  }
+  isDead() { return this.age >= this.life; }
+  draw(ctx) {
+    ctx.save();
+    ctx.font = `${this.size}px monospace`;
+    ctx.fillStyle = `rgba(255,255,255,${this.alpha})`;
+    ctx.fillText(this.text, this.x, this.y);
+    ctx.restore();
+  }
+}
+
+async function initPose() {
+  const vision = await FilesetResolver.forVisionTasks(
+    'https://cdn.jsdelivr.net/npm/@mediap    this.vy = -0.4 - speed * 2;
     this.vx = (Math.random() - 0.5) * 0.6;
     this.life = 120 + Math.random() * 80;
     this.age = 0;
