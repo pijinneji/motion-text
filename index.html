@@ -175,19 +175,6 @@ function loop() {
       }
     }
 
-    // 全関節を赤点で表示（デバッグ用）
-    for (let j of jointMotions) {
-      ctx.beginPath();
-      ctx.arc(j.x, j.y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,80,80,0.6)';
-      ctx.fill();
-    }
-
-    // デバッグ表示
-    ctx.font = '11px monospace';
-    ctx.fillStyle = 'rgba(150,150,150,0.8)';
-    ctx.fillText('motion: ' + motionAmount.toFixed(4), 10, 20);
-    ctx.fillText('particles: ' + textParticles.length, 10, 35);
   }
 
   textParticles = textParticles.filter(p => !p.isDead());
