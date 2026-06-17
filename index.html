@@ -196,6 +196,11 @@ function loop() {
       }
     }
 
+    // デバッグ表示（一時）
+    ctx.font = '13px monospace';
+    ctx.fillStyle = 'rgba(200,200,200,0.9)';
+    ctx.fillText('motion: ' + motionAmount.toFixed(5), 10, 20);
+
     // 瞬き検出
     const leftEyeDist  = Math.abs(landmarks[LEFT_EYE_TOP].y  - landmarks[LEFT_EYE_BOTTOM].y);
     const rightEyeDist = Math.abs(landmarks[RIGHT_EYE_TOP].y - landmarks[RIGHT_EYE_BOTTOM].y);
