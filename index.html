@@ -50,7 +50,9 @@ const ctx = canvas.getContext('2d');
 let faceLandmarker = null;
 let textParticles = [];
 let lastGenerateTime = 0;
+let lastMotionTime = 0;
 const GENERATE_INTERVAL = 1500;
+const STILLNESS_TIMEOUT = 1000;
 let prevLandmarks = null;
 
 function resize() {
@@ -163,7 +165,10 @@ function loop() {
 
     // テキスト生成
     let now = performance.now();
-    if (motionAmount > 0.008 && now - lastGenerateTime > GENERATE_INTERVAL) {
+    if (motionAmount > 0.003) lastMotionTime = now;
+    const faceIsMoving = (now - lastMotionTime) < STILLNESS_TIMEOUT;
+
+    if (faceIsMoving && now - lastGenerateTime > GENERATE_INTERVAL) {
       lastGenerateTime = now;
 
       let tier = motionAmount < 0.014 ? 'slow' : motionAmount < 0.022 ? 'medium' : 'fast';
@@ -171,14 +176,12 @@ function loop() {
       let count = COUNT[tier];
 
       let sorted = [...faceMotions].sort((a, b) => b.dist - a.dist);
-      let topJoints = sorted.slice(0, 5);
+      let topJoints = sorted.slice(0, count);
 
       for (let i = 0; i < count; i++) {
         let joint = topJoints[i % topJoints.length];
-        let ox = (Math.random() - 0.5) * 80;
-        let oy = (Math.random() - 0.5) * 80;
         let word = pool[Math.floor(Math.random() * pool.length)];
-        textParticles.push(new TextParticle(joint.x + ox, joint.y + oy, word, motionAmount * 10, tier));
+        textParticles.push(new TextParticle(joint.x, joint.y, word, motionAmount * 10, tier));
       }
     }
   }
