@@ -176,13 +176,13 @@ function loop() {
 
     // テキスト生成
     let now = performance.now();
-    if (motionAmount > 0.003) lastMotionTime = now;
+    if (motionAmount > 0.00012) lastMotionTime = now;
     const faceIsMoving = (now - lastMotionTime) < STILLNESS_TIMEOUT;
 
     if (faceIsMoving && now - lastGenerateTime > GENERATE_INTERVAL) {
       lastGenerateTime = now;
 
-      let tier = motionAmount < 0.014 ? 'slow' : motionAmount < 0.022 ? 'medium' : 'fast';
+      let tier = motionAmount < 0.00030 ? 'slow' : motionAmount < 0.00060 ? 'medium' : 'fast';
       let pool = VOCABULARY[tier];
       let count = COUNT[tier];
 
@@ -195,11 +195,6 @@ function loop() {
         textParticles.push(new TextParticle(joint.x, joint.y, word, motionAmount * 10, tier));
       }
     }
-
-    // デバッグ表示（一時）
-    ctx.font = '13px monospace';
-    ctx.fillStyle = 'rgba(200,200,200,0.9)';
-    ctx.fillText('motion: ' + motionAmount.toFixed(5), 10, 20);
 
     // 瞬き検出
     const leftEyeDist  = Math.abs(landmarks[LEFT_EYE_TOP].y  - landmarks[LEFT_EYE_BOTTOM].y);
