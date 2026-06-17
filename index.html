@@ -47,10 +47,16 @@ const video = document.getElementById('videoEl');
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
+const LEFT_EYE_TOP = 159, LEFT_EYE_BOTTOM = 145;
+const RIGHT_EYE_TOP = 386, RIGHT_EYE_BOTTOM = 374;
+const BLINK_THRESHOLD = 0.012;
+const BLINK_COOLDOWN = 400;
+
 let faceLandmarker = null;
 let textParticles = [];
 let lastGenerateTime = 0;
 let lastMotionTime = 0;
+let lastBlinkTime = 0;
 const GENERATE_INTERVAL = 1500;
 const STILLNESS_TIMEOUT = 1000;
 let prevLandmarks = null;
@@ -182,6 +188,23 @@ function loop() {
         let joint = topJoints[i % topJoints.length];
         let word = pool[Math.floor(Math.random() * pool.length)];
         textParticles.push(new TextParticle(joint.x, joint.y, word, motionAmount * 10, tier));
+      }
+    }
+
+    // 瞬き検出
+    const leftEyeDist  = Math.abs(landmarks[LEFT_EYE_TOP].y  - landmarks[LEFT_EYE_BOTTOM].y);
+    const rightEyeDist = Math.abs(landmarks[RIGHT_EYE_TOP].y - landmarks[RIGHT_EYE_BOTTOM].y);
+    const eyeOpenDist  = (leftEyeDist + rightEyeDist) / 2;
+
+    if (eyeOpenDist < BLINK_THRESHOLD && now - lastBlinkTime > BLINK_COOLDOWN) {
+      lastBlinkTime = now;
+      const blinkPositions = [
+        lmToScreen(landmarks[LEFT_EYE_TOP]),
+        lmToScreen(landmarks[RIGHT_EYE_TOP]),
+      ];
+      for (const pos of blinkPositions) {
+        const word = VOCABULARY.slow[Math.floor(Math.random() * VOCABULARY.slow.length)];
+        textParticles.push(new TextParticle(pos.x, pos.y, word, 2, 'slow'));
       }
     }
   }
