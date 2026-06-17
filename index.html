@@ -37,11 +37,6 @@ const VOCABULARY = {
 };
 const COUNT = { slow: 3, medium: 6, fast: 10 };
 
-const TIER_COLOR = {
-  slow:   [180, 220, 255],
-  medium: [255, 255, 255],
-  fast:   [255, 160, 140],
-};
 
 const video = document.getElementById('videoEl');
 const canvas = document.getElementById('mainCanvas');
@@ -74,26 +69,36 @@ class TextParticle {
     this.y = y;
     this.text = text;
     this.alpha = 1;
-    this.vy = -0.4 - speed * 2;
-    this.vx = (Math.random() - 0.5) * 0.6;
-    this.life = 120 + Math.random() * 80;
+    this.vy = -0.2 - speed * 0.3;
+    this.vxBase = (Math.random() - 0.5) * 0.2;
+    this.phase = Math.random() * Math.PI * 2;
+    this.swing = 0.25 + Math.random() * 0.35;
+    this.life = 200 + Math.random() * 100;
     this.age = 0;
-    this.size = 12 + Math.floor(Math.random() * 12);
-    this.color = TIER_COLOR[tier] || TIER_COLOR.medium;
+    this.size = 12 + Math.floor(Math.random() * 10);
+
+    if (tier === 'slow') {
+      this.color = [180, 220, 255];
+    } else if (tier === 'fast') {
+      this.color = [255, 160, 140];
+    } else {
+      this.color = [255, 255, 255];
+    }
   }
   update() {
-    this.x += this.vx;
+    this.x += this.vxBase + Math.sin(this.age * 0.04 + this.phase) * this.swing;
     this.y += this.vy;
     this.age++;
-    if (this.age > this.life * 0.5) {
-      this.alpha = (this.life - this.age) / (this.life * 0.5);
+    const fadeStart = this.life * 0.6;
+    if (this.age > fadeStart) {
+      this.alpha = Math.max(0, (this.life - this.age) / (this.life - fadeStart));
     }
   }
   isDead() { return this.age >= this.life; }
   draw(ctx) {
     ctx.save();
-    ctx.font = `${this.size}px monospace`;
     const [r, g, b] = this.color;
+    ctx.font = `${this.size + this.age * 0.04}px monospace`;
     ctx.fillStyle = `rgba(${r},${g},${b},${this.alpha})`;
     ctx.fillText(this.text, this.x, this.y);
     ctx.restore();
